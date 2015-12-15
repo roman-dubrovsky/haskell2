@@ -10,6 +10,8 @@ import Data.Maybe
 import Data.CSV.Conduit
 import Data.Conduit
 import System.Console.CmdArgs
+import Control.Monad.State
+import System.Random
 
 import qualified Data.Vector as V
 import qualified Data.Text as T
@@ -72,6 +74,42 @@ testing clasify objects = results / size
         results = foldl checkResult 0 objects
         size = fromIntegral $ length objects
 
+
+-- =====  state part =====
+
+randomizeObjects :: [Object] -> Float -> StdGen -> ([Object], [Object])
+
+randomizeObjects [] _ _ = ([], [])
+randomizeObjects (x:xs) l rand
+  | l' < l = (x:x1, x2)
+  | otherwise = (x1, x:x2)
+  where (x1, x2) = randomizeObjects xs l rand
+        l' = fst $ random rand
+
+type CState = (Double, Clasify)
+
+clasifyState :: (Int, [Object], StdGen) -> State CState Clasify
+clasifyState (0, _, _) = do
+  (_, cl) <- get
+  return cl
+
+clasifyState (n, objs, rand) = do
+  (val, cl) <- get
+
+  let (learn, test) = randomizeObjects objs 0.8 rand
+  let clasify = training learn
+  let cof = testing clasify test
+  let isNew = cof > val
+
+  case isNew of
+      True   -> put (cof, clasify)
+      _      -> put (val, cl)
+
+  clasifyState (n-1, objs, snd (split rand))
+
+startState = (0.0, M.empty)
+
+
 -- =====  input parse  =====
 
 convertFromCsv :: InputConfigs -> V.Vector (Row String) -> [Object]
@@ -123,8 +161,10 @@ main = do
   configs <- cmdArgs defaultInputConfigs
   let csvOpts = defCSVSettings {csvSep = head(delemiter configs), csvQuoteChar = Nothing}
 
+  rand <- newStdGen
+
   input <- runResourceT $ readCSVFile csvOpts $ inputFile configs
   let objects = convertFromCsv configs input
-  let result = training objects
+  let result = evalState (clasifyState (3, objects, rand)) startState
 
   runResourceT $ CL.sourceList (convertToCsv result) $$ CB.sinkIOHandle (buildOutputHandle configs)
