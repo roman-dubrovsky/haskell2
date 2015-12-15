@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Main where
 
 import Prelude
@@ -6,6 +8,7 @@ import System.IO
 import Data.Maybe
 import Data.CSV.Conduit
 import Data.Conduit
+import System.Console.CmdArgs
 
 import qualified Data.Vector as V
 import qualified Data.Text as T
@@ -68,17 +71,39 @@ testing clasify objects = results / size
 
 -- =====  input parse  =====
 
-convertFromCsv :: V.Vector (Row String) -> [Object]
-convertFromCsv = processCsv . V.toList
-    where processCsv = filter (not . null) . map processRow
+convertFromCsv :: InputConfigs -> V.Vector (Row String) -> [Object]
+convertFromCsv configs = processCsv . V.toList
+    where processCsv = filter (not . null) . map processRow . skipHeader
           processRow row = (last row, processDoubles(init row))
-          processDoubles = map (fromMaybe 0.0) . filter isJust . map maybeRead
+          processDoubles = map (fromMaybe 0.0) . filter isJust . map maybeRead . skipNumber
           maybeRead = fmap fst . listToMaybe . (reads :: String -> [(Double, String)])
+          skipHeader = if header configs then tail else id
+          skipNumber = if rowNumber configs then tail else id
+
+-- =====  cmd args  =====
+
+data InputConfigs = InputConfigs {
+  delemiter :: String
+  ,inputFile :: FilePath
+  ,outputFile :: FilePath
+  ,header :: Bool
+  ,rowNumber :: Bool
+  } deriving (Show, Data, Typeable)
+
+defaultInputConfigs = InputConfigs {
+  delemiter = ","                         &= help "Csv delemiter"
+  ,inputFile = "./examples/butterfly.txt" &= help "Input file name"
+  ,outputFile = ""                        &= help "Output file name (default console)"
+  ,header = False                         &= help "Have csv header?"
+  ,rowNumber = False                      &= help "Have csv number (row's head)?"
+}  &= summary "Lab2 Bayes 2015" &= program "lab2"
 
 main :: IO ()
 main = do
-  let csvOpts = defCSVSettings {csvSep = ',', csvQuoteChar = Nothing}
+  configs <- cmdArgs defaultInputConfigs
+  let csvOpts = defCSVSettings {csvSep = head(delemiter configs), csvQuoteChar = Nothing}
 
-  input <- runResourceT $ readCSVFile csvOpts "./examples/butterfly.txt"
+  input <- runResourceT $ readCSVFile csvOpts $ inputFile configs
+  let objects = convertFromCsv configs input
 
-  print $ convertFromCsv input
+  print objects
