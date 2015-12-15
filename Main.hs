@@ -89,15 +89,15 @@ randomizeObjects (x:xs) l rand
 
 type CState = (Double, Clasify)
 
-clasifyState :: (Int, [Object], StdGen) -> State CState Clasify
-clasifyState (0, _, _) = do
+clasifyState :: (Int, [Object], StdGen, Int) -> State CState Clasify
+clasifyState (0, _, _, _) = do
   (_, cl) <- get
   return cl
 
-clasifyState (n, objs, rand) = do
+clasifyState (n, objs, rand, t) = do
   (val, cl) <- get
 
-  let (learn, test) = randomizeObjects objs 50 rand
+  let (learn, test) = randomizeObjects objs t rand
   let clasify = training learn
   let cof = testing clasify test
   let isNew = cof > val
@@ -106,7 +106,7 @@ clasifyState (n, objs, rand) = do
       True          -> put (cof, clasify)
       _             -> put (val, cl)
 
-  clasifyState (n-1, objs, snd (split rand))
+  clasifyState (n-1, objs, snd (split rand), t)
 
 -- =====  input parse  =====
 
@@ -169,6 +169,6 @@ main = do
   let objects = convertFromCsv configs input
 
   let startState = (-1.0 , M.empty)
-  let result = evalState (clasifyState (3, objects, rand)) startState
+  let result = evalState (clasifyState ((number configs), objects, rand, (percent configs))) startState
 
   runResourceT $ CL.sourceList (convertToCsv result) $$ CB.sinkIOHandle (buildOutputHandle configs)
