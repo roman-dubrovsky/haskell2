@@ -24,7 +24,8 @@ executable lab2
                         vector,
                         csv-conduit,conduit,conduit-extra,
                         text,
-                        bytestring
+                        bytestring,
+                        containers
 
   -- hs-source-dirs:
   default-language:    Haskell2010
