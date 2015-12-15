@@ -13,6 +13,8 @@ import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
 
+-- =====  types =====
+
 type Object = (String,[Double])
 
 type Property = [Double]
@@ -23,7 +25,7 @@ type ClassProperty = (Double, Double)
 type ClassPropertyCollection = M.Map Int ClassProperty
 type Clasify = M.Map String ClassPropertyCollection
 
--- =====  bayes clasify =====
+-- =====  bayes clasify traning =====
 
 traningProperties :: [Property] -> PropertiesCollection
 traningProperties = foldl trainingGroup M.empty . transpose
@@ -41,8 +43,24 @@ calculateProperties prop = (avge, disp)
         size = fromIntegral $ length prop
 
 training :: [Object] -> Clasify
-training = M.map calculateClasses . traningObjects
-  where calculateClasses = M.map calculateProperties
+training objs = M.map calculateClasses $ traningObjects objs
+  where calculateClasses = M.map (\x -> calculateProperties x)
+
+-- =====  bayes clasify testing =====
+
+findClass :: Clasify -> [Double] -> String
+findClass clasify obj = snd $ maximum $ map (\(x,y) -> (y,x)) $ M.toList $ M.map findCoffs clasify
+  where findCoffs prop_collection = product $ zipWith zipper obj $ M.elems prop_collection
+        zipper prop (avge, disp) = 1 / sqrt(2 * pi * disp) * exp ((-1) * (prop - avge) ** 2 / 2 / disp)
+
+testingObject :: Clasify -> Object -> Bool
+testingObject clasify (clas, prop) = clas == findClass clasify prop
+
+testing :: Clasify -> [Object] -> Double
+testing clasify objects = results / size
+  where checkResult acc object = if testingObject clasify object then acc + 1 else acc
+        results = foldl checkResult 0 objects
+        size = fromIntegral $ length objects
 
 -- =====  input parse  =====
 
