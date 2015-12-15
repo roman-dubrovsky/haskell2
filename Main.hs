@@ -75,7 +75,8 @@ convertFromCsv :: InputConfigs -> V.Vector (Row String) -> [Object]
 convertFromCsv configs = processCsv . V.toList
     where processCsv = filter (not . null) . map processRow . skipHeader
           processRow row = (last row, processDoubles(init row))
-          processDoubles = map (fromMaybe 0.0) . filter isJust . map maybeRead . skipNumber
+          processDoubles = map (fromMaybe 0.0) . filter isJust . map maybeRead . filterEmpty . skipNumber
+          filterEmpty = filter (\s -> T.strip (T.pack s) /= T.pack "")
           maybeRead = fmap fst . listToMaybe . (reads :: String -> [(Double, String)])
           skipHeader = if header configs then tail else id
           skipNumber = if rowNumber configs then tail else id
@@ -105,5 +106,9 @@ main = do
 
   input <- runResourceT $ readCSVFile csvOpts $ inputFile configs
   let objects = convertFromCsv configs input
+  let result = training objects
 
-  print objects
+  print result
+
+  let test = testing result objects
+  print test
