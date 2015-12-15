@@ -77,14 +77,15 @@ testing clasify objects = results / size
 
 -- =====  state part =====
 
-randomizeObjects :: [Object] -> Float -> StdGen -> ([Object], [Object])
+randomizeObjects :: [Object] -> Int -> StdGen -> ([Object], [Object])
 
 randomizeObjects [] _ _ = ([], [])
 randomizeObjects (x:xs) l rand
   | l' < l = (x:x1, x2)
   | otherwise = (x1, x:x2)
-  where (x1, x2) = randomizeObjects xs l rand
-        l' = fst $ random rand
+  where (x1, x2) = randomizeObjects xs l new_rand
+        l' = head $ randomRs (0, 100) $ rand
+        new_rand = snd (split rand)
 
 type CState = (Double, Clasify)
 
@@ -96,19 +97,16 @@ clasifyState (0, _, _) = do
 clasifyState (n, objs, rand) = do
   (val, cl) <- get
 
-  let (learn, test) = randomizeObjects objs 0.8 rand
+  let (learn, test) = randomizeObjects objs 50 rand
   let clasify = training learn
   let cof = testing clasify test
   let isNew = cof > val
 
   case isNew of
-      True   -> put (cof, clasify)
-      _      -> put (val, cl)
+      True          -> put (cof, clasify)
+      _             -> put (val, cl)
 
   clasifyState (n-1, objs, snd (split rand))
-
-startState = (0.0, M.empty)
-
 
 -- =====  input parse  =====
 
@@ -146,14 +144,18 @@ data InputConfigs = InputConfigs {
   ,outputFile :: FilePath
   ,header :: Bool
   ,rowNumber :: Bool
+  ,number :: Int
+  ,percent :: Int
   } deriving (Show, Data, Typeable)
 
 defaultInputConfigs = InputConfigs {
   delemiter = ","                         &= help "Csv delemiter"
-  ,inputFile = "./examples/butterfly.txt" &= help "Input file name"
+  ,inputFile = "./examples/irises.txt"    &= help "Input file name"
   ,outputFile = ""                        &= help "Output file name (default console)"
   ,header = False                         &= help "Have csv header?"
   ,rowNumber = False                      &= help "Have csv number (row's head)?"
+  ,number = 5                             &= help "Numbers count for studing"
+  ,percent = 50                           &= help "Percent on learning objects"
 }  &= summary "Lab2 Bayes 2015" &= program "lab2"
 
 main :: IO ()
@@ -165,6 +167,8 @@ main = do
 
   input <- runResourceT $ readCSVFile csvOpts $ inputFile configs
   let objects = convertFromCsv configs input
+
+  let startState = (-1.0 , M.empty)
   let result = evalState (clasifyState (3, objects, rand)) startState
 
   runResourceT $ CL.sourceList (convertToCsv result) $$ CB.sinkIOHandle (buildOutputHandle configs)
