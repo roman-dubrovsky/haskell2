@@ -2,6 +2,7 @@
 
 module Main where
 
+import Numeric
 import Prelude
 import Data.List
 import System.IO
@@ -15,6 +16,8 @@ import qualified Data.Text as T
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
+import qualified Data.Conduit.Binary as CB
+import qualified Data.Conduit.List as CL
 
 -- =====  types =====
 
@@ -81,6 +84,22 @@ convertFromCsv configs = processCsv . V.toList
           skipHeader = if header configs then tail else id
           skipNumber = if rowNumber configs then tail else id
 
+-- =====  output builder  =====
+
+convertClasify :: Clasify -> [String]
+convertClasify clasify = map (\x -> concat (showClass x)) $ M.toList clasify
+  where showClass (clas, prop) = (:) clas $ map showProp $ M.toList prop
+        showProp (index, values) = " - " ++ show (index + 1) ++ "(" ++ (showValues values) ++ ")"
+        showValues (a,b,_) =  (take 6 $ show a) ++ ";" ++ (take 6 $ show b)
+
+convertToCsv :: Clasify -> [B.ByteString]
+convertToCsv = intersperse (BS.pack [13, 10]) . map B.pack . convertClasify
+
+buildOutputHandle :: InputConfigs -> IO Handle
+buildOutputHandle configs
+    | outputFile configs /= ""  = openFile (outputFile configs) WriteMode
+    | otherwise            = return stdout
+
 -- =====  cmd args  =====
 
 data InputConfigs = InputConfigs {
@@ -108,7 +127,4 @@ main = do
   let objects = convertFromCsv configs input
   let result = training objects
 
-  print result
-
-  let test = testing result objects
-  print test
+  runResourceT $ CL.sourceList (convertToCsv result) $$ CB.sinkIOHandle (buildOutputHandle configs)
