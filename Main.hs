@@ -10,7 +10,6 @@ import System.IO
 import Data.Maybe
 import Data.Conduit
 import Control.Monad.Trans.Resource
---import Data.CSV.Conduit
 import System.Console.CmdArgs
 import Control.Monad.State
 import System.Random
@@ -163,7 +162,6 @@ parseString delimetr = do
     Just s -> do
       yield $ splitOn delimetr s
       parseString delimetr
-
 
 -- =====  cmd args  =====
 

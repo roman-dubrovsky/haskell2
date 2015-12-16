@@ -22,7 +22,7 @@ executable lab2
   -- other-extensions:
   build-depends:        base >=4.8 && <4.9,
                         vector,
-                        csv-conduit,conduit,conduit-extra,
+                        conduit,conduit-extra,
                         text,
                         bytestring,
                         containers,
