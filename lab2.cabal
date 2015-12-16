@@ -28,7 +28,9 @@ executable lab2
                         containers,
                         cmdargs,
                         random,
-                        mtl
+                        mtl,
+                        split,
+                        resourcet
 
   -- hs-source-dirs:
   default-language:    Haskell2010

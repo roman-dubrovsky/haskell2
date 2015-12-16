@@ -5,10 +5,12 @@ module Main where
 import Numeric
 import Prelude
 import Data.List
+import Data.List.Split
 import System.IO
 import Data.Maybe
-import Data.CSV.Conduit
 import Data.Conduit
+import Control.Monad.Trans.Resource
+--import Data.CSV.Conduit
 import System.Console.CmdArgs
 import Control.Monad.State
 import System.Random
@@ -85,7 +87,7 @@ randomizeObjects (x:xs) l rand
   | otherwise = (x1, x:x2)
   where (x1, x2) = randomizeObjects xs l new_rand
         l' = head $ randomRs (0, 100) $ rand
-        new_rand = snd (split rand)
+        new_rand = snd (System.Random.split rand)
 
 type CState = (Double, Clasify)
 
@@ -106,11 +108,11 @@ clasifyState (n, objs, rand, t) = do
       True          -> put (cof, clasify)
       _             -> put (val, cl)
 
-  clasifyState (n-1, objs, snd (split rand), t)
+  clasifyState (n-1, objs, snd (System.Random.split rand), t)
 
 -- =====  input parse  =====
 
-convertFromCsv :: InputConfigs -> V.Vector (Row String) -> [Object]
+convertFromCsv :: InputConfigs -> V.Vector ([String]) -> [Object]
 convertFromCsv configs = processCsv . V.toList
     where processCsv = filter (not . null) . map processRow . skipHeader
           processRow row = (last row, processDoubles(init row))
@@ -137,6 +139,32 @@ buildOutputHandle configs
     | outputFile configs /= ""  = openFile (outputFile configs) WriteMode
     | otherwise            = return stdout
 
+-- =====  conduit function =====
+
+sourse :: String -> Source IO String
+sourse filepath = do
+  handle <- liftIO $ openFile filepath ReadMode
+  loopRead handle
+  where
+    loopRead handle = do
+      eof <- liftIO $ hIsEOF handle
+      if eof
+        then return ()
+        else do
+          c <- liftIO $ hGetLine handle
+          yield c
+          loopRead handle
+
+parseString :: String -> Conduit String IO [String]
+parseString delimetr = do
+  str <- await
+  case str of
+    Nothing -> return ()
+    Just s -> do
+      yield $ splitOn delimetr s
+      parseString delimetr
+
+
 -- =====  cmd args  =====
 
 data InputConfigs = InputConfigs {
@@ -162,12 +190,14 @@ defaultInputConfigs = InputConfigs {
 main :: IO ()
 main = do
   configs <- cmdArgs defaultInputConfigs
-  let csvOpts = defCSVSettings {csvSep = head(delemiter configs), csvQuoteChar = Nothing}
-
   rand <- newStdGen
 
-  input <- runResourceT $ readCSVFile csvOpts $ inputFile configs
-  let objects = convertFromCsv configs input
+  let sourse' = sourse $ inputFile configs
+  let parseString' = parseString $ delemiter configs
+
+  input <- sourse' $= parseString' $$ CL.consume
+
+  let objects = convertFromCsv configs $ V.fromList input
 
   let startState = (-1.0 , M.empty)
   let result = evalState (clasifyState ((number configs), objects, rand, (percent configs))) startState
