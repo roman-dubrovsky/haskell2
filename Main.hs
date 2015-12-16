@@ -129,7 +129,8 @@ convertClasify clasify = map (\x -> concat (showClass x)) $ M.toList clasify
         showValues (a,b,_) =  (take 6 $ show a) ++ ";" ++ (take 6 $ show b)
 
 convertToCsv :: Clasify -> [B.ByteString]
-convertToCsv = intersperse (BS.pack [13, 10]) . map B.pack . convertClasify
+convertToCsv = map (\x -> B.append x newLine) . map B.pack . convertClasify
+  where newLine = BS.pack [13, 10]
 
 buildOutputHandle :: InputConfigs -> IO Handle
 buildOutputHandle configs
