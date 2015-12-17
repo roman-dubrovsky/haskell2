@@ -13,3 +13,7 @@ cabal.config
 *.prof
 *.hp
 *.aux
+
+Main
+Main.eventlog
+

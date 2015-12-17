@@ -33,3 +33,10 @@ Common flags:
   -V --version          Print version information
      --numeric-version  Print just the version number
 ```
+
+## Lab3
+
+```
+ghc -threaded -eventlog -rtsopts --make Main.hs
+./Main +RTS -ls -N2
+```
