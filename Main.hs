@@ -55,7 +55,7 @@ calculateProperties all prop = (avge, disp, per)
 
 training :: [Object] -> Clasify
 training objs = M.map calculateClasses $ traningObjects objs
-  where calculateClasses = M.map (\x -> calculateProperties size x)
+  where calculateClasses = M.fromList . runPar . parMap (\(a, x) -> (a, calculateProperties size x)) . M.toList
         size = fromIntegral $ length objs
 
 -- =====  bayes clasify testing =====
