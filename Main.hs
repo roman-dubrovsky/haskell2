@@ -12,6 +12,7 @@ import Data.Conduit
 import Control.Monad.Trans.Resource
 import System.Console.CmdArgs
 import Control.Monad.State
+import Control.Monad.Par
 import System.Random
 
 import qualified Data.Vector as V
@@ -66,13 +67,12 @@ findClass clasify obj = snd $ maximum $ map (\(x,y)  -> (y,x)) $ M.toList $ M.ma
         persent prop_collection = percentFor $ head $ M.elems prop_collection
         percentFor (_, _, x) = x
 
-testingObject :: Clasify -> Object -> Bool
-testingObject clasify (clas, prop) = clas == findClass clasify prop
+testingObject :: Clasify -> Object -> Double
+testingObject clasify (clas, prop) = if (clas == findClass clasify prop) then 1 else 0
 
 testing :: Clasify -> [Object] -> Double
 testing clasify objects = results / size
-  where checkResult acc object = if testingObject clasify object then acc + 1 else acc
-        results = foldl checkResult 0 objects
+  where results = sum $ runPar $ parMap (testingObject clasify) objects
         size = fromIntegral $ length objects
 
 
@@ -92,11 +92,11 @@ type CState = (Double, Clasify)
 
 clasifyState :: (Int, [Object], StdGen, Int) -> State CState Clasify
 clasifyState (0, _, _, _) = do
-  (_, cl) <- get
+  (_, cl) <- Control.Monad.State.get
   return cl
 
 clasifyState (n, objs, rand, t) = do
-  (val, cl) <- get
+  (val, cl) <- Control.Monad.State.get
 
   let (learn, test) = randomizeObjects objs t rand
   let clasify = training learn
@@ -104,8 +104,8 @@ clasifyState (n, objs, rand, t) = do
   let isNew = cof > val
 
   case isNew of
-      True          -> put (cof, clasify)
-      _             -> put (val, cl)
+      True          -> Control.Monad.State.put (cof, clasify)
+      _             -> Control.Monad.State.put (val, cl)
 
   clasifyState (n-1, objs, snd (System.Random.split rand), t)
 

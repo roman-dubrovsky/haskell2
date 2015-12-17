@@ -30,7 +30,8 @@ executable lab2
                         random,
                         mtl,
                         split,
-                        resourcet
+                        resourcet,
+                        monad-par
 
   -- hs-source-dirs:
   default-language:    Haskell2010
